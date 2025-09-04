@@ -2,9 +2,9 @@ import os, json, numpy as np, tensorflow as tf, matplotlib.pyplot as plt
 from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, confusion_matrix
 from model import HeartDiseaseModel
 
-# paths
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
+# paths (FIXED)
+HERE = os.path.dirname(os.path.abspath(__file__))  
+ROOT = os.path.dirname(HERE)                    
 PROC = os.path.join(ROOT, "data", "processed")
 ART  = os.path.join(ROOT, "artifacts")
 PLOTS = os.path.join(ART, "plots")
@@ -38,7 +38,7 @@ history = model.fit(X_train, y_train,
                     epochs=200, batch_size=64,
                     callbacks=callbacks, verbose=2)
 
-# threshold search (coarse+fine, maximize val accuracy; tie-break precision)
+# threshold search
 val_probs = model.predict(X_val, verbose=0).ravel()
 def eval_thr(t):
     yv = (val_probs >= t).astype(int)
@@ -46,18 +46,14 @@ def eval_thr(t):
             precision_score(y_val, yv, zero_division=0),
             recall_score(y_val, yv, zero_division=0),
             f1_score(y_val, yv, zero_division=0))
-
 coarse = np.linspace(0.05, 0.99, 191)
 best_thr, best_acc, best_tuple = 0.5, -1.0, None
-
 for t in coarse:
     acc, prec, rec, f1 = eval_thr(t)
     if acc > best_acc or (acc == best_acc and prec > (best_tuple[1] if best_tuple else -1)):
         best_thr, best_acc, best_tuple = float(t), acc, (acc, prec, rec, f1)
-
 low, high = max(0.01, best_thr-0.05), min(0.999, best_thr+0.05)
 fine = np.linspace(low, high, int((high-low)/0.001)+1)
-
 for t in fine:
     acc, prec, rec, f1 = eval_thr(t)
     if acc > best_acc or (acc == best_acc and prec > best_tuple[1]):

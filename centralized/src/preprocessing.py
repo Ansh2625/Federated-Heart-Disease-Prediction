@@ -5,9 +5,9 @@ from sklearn.preprocessing import StandardScaler
 
 RANDOM_STATE = 7
 
-# paths
-HERE = os.path.dirname(os.path.abspath(__file__))                 
-ROOT = os.path.dirname(os.path.dirname(HERE))                    
+# paths (FIXED: go up ONE level to centralized/)
+HERE = os.path.dirname(os.path.abspath(__file__))   
+ROOT = os.path.dirname(HERE)                           
 RAW  = os.path.join(ROOT, "data", "raw", "framingham.csv")
 PROC = os.path.join(ROOT, "data", "processed")
 os.makedirs(PROC, exist_ok=True)
@@ -39,7 +39,6 @@ X_train = clip_df(X_train); X_val = clip_df(X_val); X_test = clip_df(X_test)
 # impute + scale (fit on train only)
 imp = SimpleImputer(strategy="median")
 scl = StandardScaler()
-
 X_train = imp.fit_transform(X_train)
 scl.fit(X_train)
 X_val  = scl.transform(imp.transform(X_val))
@@ -52,7 +51,6 @@ np.save(os.path.join(PROC, "X_test.npy"),  X_test.astype(np.float32))
 np.save(os.path.join(PROC, "y_train.npy"), y_train.astype(np.int64))
 np.save(os.path.join(PROC, "y_val.npy"),   y_val.astype(np.int64))
 np.save(os.path.join(PROC, "y_test.npy"),  y_test.astype(np.int64))
-
 joblib.dump(imp, os.path.join(PROC, "imputer.joblib"))
 joblib.dump(scl, os.path.join(PROC, "scaler.joblib"))
 np.save(os.path.join(PROC, "feature_names.npy"), np.array(list(X.columns)))

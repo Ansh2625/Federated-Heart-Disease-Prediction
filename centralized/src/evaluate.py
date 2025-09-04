@@ -3,8 +3,9 @@ from sklearn.metrics import (confusion_matrix, classification_report, accuracy_s
                              precision_score, recall_score, f1_score, roc_curve, auc, precision_recall_curve)
 from model import HeartDiseaseModel
 
-HERE = os.path.dirname(os.path.abspath(__file__))
-ROOT = os.path.dirname(os.path.dirname(HERE))
+# paths (FIXED)
+HERE = os.path.dirname(os.path.abspath(__file__))  
+ROOT = os.path.dirname(HERE)                        
 PROC = os.path.join(ROOT, "data", "processed")
 ART  = os.path.join(ROOT, "artifacts")
 PLOTS = os.path.join(ART, "plots")
