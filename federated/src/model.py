@@ -40,15 +40,11 @@ class HeartDiseaseModel(Model):
 
     def call(self, inputs, training=False):
         x = self.input_norm(inputs, training=training)
-
         h1 = self.b1(x, training=training)
-
         h2 = self.b2_dense(h1)
         h2 = self.b2_bn(h2, training=training)
         h2 = tf.nn.relu(h2)
         h2 = self.b2_do(h2, training=training)
         h2 = h2 + self.res_proj(h1)  # residual
-
         h3 = self.b3(h2, training=training)
-
         return self.out(h3)
