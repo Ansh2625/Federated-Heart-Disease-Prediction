@@ -1,0 +1,16 @@
+# venvs
+.venv/
+venv/
+ENV/
+env/
+# bytecode
+**/__pycache__/
+*.pyc
+# IDE
+.vscode/
+.idea/
+# data/artifacts
+centralized/data/raw/
+federated/data/clients/
+federated/data/global/
+federated/artifacts/
