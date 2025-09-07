@@ -11,6 +11,8 @@ env/
 .idea/
 # data/artifacts
 centralized/data/raw/
+federated/data/processed/
+centralized/artifacts/
 federated/data/clients/
 federated/data/global/
 federated/artifacts/

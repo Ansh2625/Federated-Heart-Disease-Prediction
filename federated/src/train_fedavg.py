@@ -1,8 +1,9 @@
 # federated/src/train_fedavg.py
 import os, json, numpy as np, matplotlib.pyplot as plt
 
-# Quiet TF's GPU/INFO spam (must be set before importing TF)
+# Quiet TF logs (set BEFORE importing TF)
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
+os.environ.setdefault("CUDA_VISIBLE_DEVICES", "")  # avoid GPU probes on CPU-only
 
 import tensorflow as tf
 import tensorflow_federated as tff
@@ -13,16 +14,16 @@ from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_sc
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.dirname(HERE)
 CLIENTS_DIR = os.path.join(ROOT, "data", "clients")
-GLOBAL_DIR = os.path.join(ROOT, "data", "global")
-ART = os.path.join(ROOT, "artifacts")
+GLOBAL_DIR  = os.path.join(ROOT, "data", "global")
+ART   = os.path.join(ROOT, "artifacts")
 PLOTS = os.path.join(ART, "plots")
 os.makedirs(ART, exist_ok=True)
 os.makedirs(PLOTS, exist_ok=True)
 
 # Hyperparams
 BATCH_SIZE = 32
-CLIENT_LR = 1e-3        # client optimizer lr
-SERVER_LR = 1.0         # server optimizer lr (FedAvg commonly 1.0)
+CLIENT_LR  = 1e-3
+SERVER_LR  = 1.0
 NUM_ROUNDS = 20
 
 # Load global val/test
@@ -58,7 +59,7 @@ def model_fn():
         metrics=[tf.keras.metrics.BinaryAccuracy(name="binary_accuracy")],
     )
 
-# Federated algorithm (TFF 0.84 requires optimizer fns)
+# Federated algorithm
 iterative_process = tff.learning.algorithms.build_weighted_fed_avg(
     model_fn=model_fn,
     client_optimizer_fn=lambda: tf.keras.optimizers.Adam(CLIENT_LR),
@@ -71,7 +72,6 @@ state = iterative_process.initialize()
 metrics_history = []
 
 def _extract_train_acc(m):
-    """Robustly pull an accuracy number from TFF metrics dict."""
     try:
         train = m["client_work"]["train"]
         for k, v in train.items():
@@ -91,20 +91,23 @@ for round_num in range(1, NUM_ROUNDS + 1):
 
 # Export final global model
 final_model = HeartDiseaseModel(input_dim=X_val.shape[1])
-final_model.compile(
-    optimizer=tf.keras.optimizers.Adam(CLIENT_LR),
-    loss="binary_crossentropy",
-    metrics=["accuracy"],
-)
+final_model.compile(optimizer=tf.keras.optimizers.Adam(CLIENT_LR),
+                    loss="binary_crossentropy", metrics=["accuracy"])
+
+# >>> BUILD THE MODEL BEFORE ASSIGNING/SAVING <<<
+_ = final_model(tf.zeros((1, X_val.shape[1]), dtype=tf.float32), training=False)
 
 weights = iterative_process.get_model_weights(state)
 weights.assign_weights_to(final_model)
 
-weights_path = os.path.join(ART, "fedavg.weights.h5")
-final_model.save_weights(weights_path)
-print(f"Saved federated weights → {weights_path}")
+# Save in BOTH formats for max compatibility
+WEIGHTS_TF = os.path.join(ART, "fedavg.weights")     # TF Checkpoint format
+WEIGHTS_H5 = os.path.join(ART, "fedavg.weights.h5")  # H5 format
+final_model.save_weights(WEIGHTS_TF)
+final_model.save_weights(WEIGHTS_H5)
+print(f"Saved federated weights → {WEIGHTS_TF}  and  {WEIGHTS_H5}")
 
-# Threshold search on validation
+# Threshold search on validation (accuracy-based; switch to F1 if you prefer)
 val_probs = final_model.predict(X_val, verbose=0).ravel()
 
 def eval_thr(t):
@@ -138,22 +141,6 @@ with open(os.path.join(ART, "selected_threshold.json"), "w") as f:
     )
 
 print(f"\nSelected threshold={best_thr:.3f} | val_acc={best_tuple[0]:.4f}")
-
-# Evaluate on test
-test_probs = final_model.predict(X_test, verbose=0).ravel()
-y_pred = (test_probs >= best_thr).astype(int)
-acc  = accuracy_score(y_test, y_pred)
-prec = precision_score(y_test, y_pred, zero_division=0)
-rec  = recall_score(y_test, y_pred, zero_division=0)
-f1   = f1_score(y_test, y_pred, zero_division=0)
-auc  = roc_auc_score(y_test, test_probs)
-
-print("\n=== FINAL TEST METRICS (Federated) ===")
-print(f"Accuracy : {acc*100:.2f}%")
-print(f"AUC      : {auc:.4f}")
-print(f"Precision: {prec:.4f}")
-print(f"Recall   : {rec:.4f}")
-print(f"F1       : {f1:.4f}")
 
 # Training curve plot
 plt.figure(figsize=(6, 4))
