@@ -1,4 +1,4 @@
-import os, json, argparse, numpy as np, matplotlib.pyplot as plt
+import os, json, argparse, numpy as np, matplotlib.pyplot as plt, joblib
 os.environ.setdefault("TF_CPP_MIN_LOG_LEVEL", "2")
 # os.environ["CUDA_VISIBLE_DEVICES"] = "-1"
 
@@ -21,6 +21,7 @@ WEIGHTS_FINAL = os.path.join(ART, "fedavg.weights.h5")
 WEIGHTS_BEST  = os.path.join(ART, "fedavg.best.h5")
 SEL_THR_JSON  = os.path.join(ART, "selected_thresholds.json")
 ACTIVE_THR    = os.path.join(ART, "active_threshold.json")
+CALIBRATOR    = os.path.join(ART, "platt_calibrator.joblib")
 
 def plot_cm(cm, path, title="Confusion Matrix"):
     fig, ax = plt.subplots(figsize=(4,3))
@@ -48,11 +49,19 @@ def main(metric):
         thr = float(active["threshold"])
         metric = active.get("metric", metric).lower()
     else:
-        # fallback to selected_thresholds.json
         with open(SEL_THR_JSON, "r") as f: sel = json.load(f)
         thr = float(sel[metric]["threshold"])
 
-    probs = model.predict(X_test, verbose=0).ravel()
+    # --- Calibrated probabilities (if calibrator present) ---
+    raw = model.predict(X_test, verbose=0).ravel()
+    if os.path.exists(CALIBRATOR):
+        calibrator = joblib.load(CALIBRATOR)
+        probs = calibrator.predict_proba(raw.reshape(-1,1))[:,1]
+        print("Using calibrated probabilities.")
+    else:
+        probs = raw
+        print("Calibrator not found; using raw probabilities.")
+
     y_pred = (probs >= thr).astype(int)
 
     acc  = accuracy_score(y_test, y_pred)
@@ -69,7 +78,7 @@ def main(metric):
     print(f"Acc: {acc*100:.2f}% | BAcc: {bacc*100:.2f}% | AUC: {auc:.4f} | AP: {ap:.4f} | "
           f"P: {prec:.4f} R: {rec:.4f} F1: {f1:.4f}")
 
-    # save plots/artifacts (single metric)
+    # save plots/artifacts
     cm_path = os.path.join(PLOTS, f"federated_confusion_{metric}.png")
     roc_path = os.path.join(PLOTS, f"federated_roc_{metric}.png")
     pr_path  = os.path.join(PLOTS, f"federated_pr_{metric}.png")
@@ -96,7 +105,6 @@ def main(metric):
     with open(os.path.join(ART, f"metrics_federated_{metric}.json"), "w") as f:
         json.dump(out, f, indent=2)
 
-    # keep ACTIVE in sync for GUI
     with open(ACTIVE_THR, "w") as f:
         json.dump({"metric": metric, "threshold": float(thr)}, f, indent=2)
 
@@ -110,6 +118,6 @@ def main(metric):
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
-    ap.add_argument("--metric", default="acc", choices=["acc","f1","bacc"])
+    ap.add_argument("--metric", default="f1", choices=["acc","f1","bacc"])
     args = ap.parse_args()
     main(args.metric)
