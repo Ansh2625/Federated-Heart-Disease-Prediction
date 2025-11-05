@@ -8,7 +8,7 @@ from sklearn.preprocessing import StandardScaler
 # ----- config -----
 RANDOM_STATE   = 7
 NUM_CLIENTS    = 5
-NON_IID        = False           # set True to enable Dirichlet split
+NON_IID        = True           
 DIRICHLET_ALPHA = 0.3
 
 HERE = os.path.dirname(os.path.abspath(__file__))

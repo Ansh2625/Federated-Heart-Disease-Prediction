@@ -33,6 +33,20 @@ model.compile(
     ]
 )
 
+# ===== :Differential Privacy =====
+from tensorflow_privacy.privacy.optimizers.dp_optimizer_keras import DPKerasAdamOptimizer
+optimizer = DPKerasAdamOptimizer(
+    l2_norm_clip=1.0,
+    noise_multiplier=1.1,
+    num_microbatches=128,
+    learning_rate=1e-4
+)
+model.compile(
+    optimizer=optimizer,
+    loss="binary_crossentropy",
+    metrics=["accuracy", tf.keras.metrics.AUC(name="auc_roc", curve="ROC"), tf.keras.metrics.AUC(name="auc_pr", curve="PR")]
+)
+
 # ===== Callbacks =====
 ckpt_path = os.path.join(ART, "saint_best")
 callbacks = [
@@ -50,8 +64,8 @@ print("\n=== Training SAINT (deep transformer MLP) ===")
 history = model.fit(
     X_train, y_train,
     validation_data=(X_val, y_val),
-    epochs=100,
-    batch_size=128,   # safe for CPU/RAM
+    epochs=10,
+    batch_size=128,
     callbacks=callbacks,
     verbose=2
 )
